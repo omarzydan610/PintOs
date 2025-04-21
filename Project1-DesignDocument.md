@@ -20,21 +20,49 @@ Please cite any offline or online sources you consulted while preparing your sub
 
 **A1:** Copy here the declaration of each new or changed `struct` or `struct` member, global or static variable, `typedef`, or enumeration. Identify the purpose of each in 25 words or less.
 
+in `thread.c` file there is ```c struct thread``` I will use a sorted data structure `sorted list` that contains wake_tick for each sleeping thread. This data structure should get the minimum wake_tick value in O(1) so that it is fast and doesn't consume time in the `timer_interrupt` function.
+
+```c
+struct sleeping_thread {
+    struct list_elem elem; //used to link the linked list with this struct
+    struct thread *thread;
+    int64_t wake_tick;
+}
+```
+
 ### ALGORITHMS
 
 **A2:** Briefly describe what happens in a call to timer_sleep(), including the effects of the timer interrupt handler.
 
+- In timer_sleep()
+
+    1. disable interrupts
+    2. wake_tick will be calculated by adding timer_ticks() + ticks
+    3. add current thread to sorted sleeping list, with threads ordered by their wake_tick
+    4. call thread_block()
+    5. restore interrupts
+
+- In timer_interrupt()
+    1. increment ticks
+    2. check if any sleeping thread have reached their wake_tick
+    3. remove all threads that have reached their wake_tick
+    4. unblock these threads using thread_unblock
+    5. call thread_tick()
+
 **A3:** What steps are taken to minimize the amount of time spent in the timer interrupt handler?
+    - Will use a sorted list to make it efficient to get the threads that should be removed from the sleeping list in O(1)
 
 ### SYNCHRONIZATION
 
 **A4:** How are race conditions avoided when multiple threads call timer_sleep() simultaneously?
-
+    - by disabling interrupts.
 **A5:** How are race conditions avoided when a timer interrupt occurs during a call to timer_sleep()?
+    - by disabling interrupts.
 
 ### RATIONALE
 
 **A6:** Why did you choose this design? In what ways is it superior to another design you considered?
+    - It is the most intuitive and easy and effective design in my opinion and I have not thought of any other approach.
 
 ## PRIORITY SCHEDULING
 
