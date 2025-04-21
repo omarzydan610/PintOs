@@ -17,7 +17,7 @@ git clone git@github.com:SajedHassan/CSEx61-dockerized-pintos.git
 ```
 5) From the directory, in which the repo is cloned, run a container from the pulled image and attach the repo as a volume:
 ```
-sudo docker run --platform linux/amd64 --rm -it -v "$(pwd)/CSEx61-dockerized-pintos:/root/pintos" a85bf0a348d6
+sudo docker run --platform linux/amd64 --rm -it -v "$(pwd)/pintos:/root/pintos" a85bf0a348d6
 ```
 Note: If you got an error which is related to specifying container image platform use this command instead:
 ```
