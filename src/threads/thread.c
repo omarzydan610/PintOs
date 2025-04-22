@@ -618,3 +618,29 @@ allocate_tid(void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(struct thread, stack);
+
+void calculatePriority(struct thread *t)
+{
+  int p = int_floor(sub_int_from_fixed(sub_int_from_fixed(div_fixed_by_int(t->recent_cpu, 4), (t->nice * 2)), PRI_MAX));
+  p *= -1;
+  if (p < PRI_MIN)
+    p = PRI_MIN;
+  else if (p > PRI_MAX)
+    p = PRI_MAX;
+  t->priority = p;
+}
+
+void calculateLoadAvg(void)
+{
+  load_avg = add_two_fixed(mult_two_fixed(div_fixed_by_int(convert_to_fixed(59), 60), load_avg), mult_two_fixed(div_fixed_by_int(convert_to_fixed(1), 60), convert_to_fixed(list_size(&ready_list))));
+}
+
+void calculateRecentCpu(struct thread *t)
+{
+  fixed_point recent_cpu = add_int_to_fixed(mult_two_fixed(div_two_fixed((mult_fixed_by_int(load_avg, 2)), (add_int_to_fixed(mult_fixed_by_int(load_avg, 2), 1))), t->recent_cpu), t->nice);
+}
+
+void incrementRecentCpu(void)
+{
+  thread_current()->recent_cpu = add_int_to_fixed(thread_current()->recent_cpu, 1);
+}
