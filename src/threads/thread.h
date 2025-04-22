@@ -107,8 +107,21 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
+static struct list sleep_list;
+
+struct sleeping_thread 
+{
+  struct list_elem elem;      /* List element. */
+  struct thread *thread;      
+  int64_t wake_tick;         
+};
+
+
 void thread_init (void);
 void thread_start (void);
+
+void thread_sleep (int64_t wake_tick);
+void thread_wake_sleeping_threads(int64_t current_tick);
 
 void thread_tick (void);
 void thread_print_stats (void);

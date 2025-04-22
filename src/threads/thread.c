@@ -37,6 +37,9 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+/* List of sleeping threads */
+static struct list sleep_list;
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
   {
@@ -92,12 +95,66 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+}
+
+/* Comparator function to sort list based on wake_tick */
+static bool
+sleep_list_less_compare(const struct list_elem *a,
+                       const struct list_elem *b,
+                       void *aux UNUSED)
+{
+  struct sleeping_thread *a_thread = list_entry(a, struct sleeping_thread, elem);
+  struct sleeping_thread *b_thread = list_entry(b, struct sleeping_thread, elem);
+  return a_thread->wake_tick < b_thread->wake_tick;
+}
+
+/* Adds a thread to the sleep list and blocks it 
+  This function must be called with interrupts off.
+*/
+void
+thread_sleep(int64_t wake_tick)
+{
+  struct sleeping_thread *sleeping_thread;
+  
+  ASSERT(!intr_context()); // checks if no interrupt is being processed
+  ASSERT(intr_get_level() == INTR_OFF) // checks if interrupts are off
+
+  sleeping_thread = malloc(sizeof(struct sleeping_thread));
+  if (sleeping_thread == NULL)
+    PANIC("Failed to allocate memory for sleeping_thread");
+
+  sleeping_thread->thread = thread_current();
+  sleeping_thread->wake_tick = wake_tick;
+
+  list_insert_ordered(&sleep_list, &sleeping_thread->elem, sleep_list_less_compare, NULL);
+  thread_block();
+}
+
+/* Wakes up a sleeping thread if the current time is greater than or equal to the wake_tick */
+void
+thread_wake_sleeping_threads(int64_t current_tick)
+{
+  struct list_elem *e;
+
+  while(!list_empty(&sleep_list))
+  {
+    e = list_front(&sleep_list);
+    struct sleeping_thread *sleeping_thread = list_entry(e, struct sleeping_thread, elem);
+    // if we have not reached the minimum wake_tick then break
+    if (current_tick < sleeping_thread->wake_tick)
+      break;
+
+    list_remove(e);
+    thread_unblock(sleeping_thread->thread);
+  }
+  
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
