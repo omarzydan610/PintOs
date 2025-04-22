@@ -1,3 +1,6 @@
+#ifndef THREADS_FIXED_POINT_H
+#define THREADS_FIXED_POINT_H
+
 #include <stdint.h>
 
 #define f (1 << 14)
@@ -79,3 +82,5 @@ fixed_point div_fixed_by_int(fixed_point x, int n)
   result.value = x.value / n;
   return result;
 }
+
+#endif /* THREADS_FIXED_POINT_H */
