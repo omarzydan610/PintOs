@@ -1,60 +1,81 @@
 #include <stdint.h>
 
-#define f (1<<14)
+#define f (1 << 14)
 
-
-int convert_to_fixed(int n)
+typedef struct
 {
-  return n * f;
+  int value;
+} fixed_point;
+
+fixed_point convert_to_fixed(int n)
+{
+  fixed_point result;
+  result.value = n * f;
+  return result;
 }
 
-int convert_to_int_floor(int x)
+int int_floor(fixed_point x)
 {
-  return x / f;
+  return x.value / f;
 }
-int convert_to_int_round(int x)
+int int_round(fixed_point x)
 {
-  if (x >= 0)
+  if (x.value >= 0)
   {
-    return (x + f / 2) / f;
+    return (x.value + f / 2) / f;
   }
   else
   {
-    return (x - f / 2) / f;
+    return (x.value - f / 2) / f;
   }
 }
 
-int add_two_fixed(int x, int y)
+fixed_point add_two_fixed(fixed_point x, fixed_point y)
 {
-  return x + y;
+  fixed_point result;
+  result.value = x.value + y.value;
+  return result;
 }
-int sub_two_fixed(int x, int y)
+fixed_point sub_two_fixed(fixed_point x, fixed_point y)
 {
-  return x - y;
+  fixed_point result;
+  result.value = x.value - y.value;
+  return result;
 }
-int mult_two_fixed(int x, int y)
+fixed_point mult_two_fixed(fixed_point x, fixed_point y)
 {
-  return ((int64_t)x) * y / f;
+  fixed_point result;
+  result.value = ((int64_t)x.value) * y.value / f;
+  return result;
 }
-int div_two_fixed(int x, int y)
+fixed_point div_two_fixed(fixed_point x, fixed_point y)
 {
-  return ((int64_t)x) * f / y;
+  fixed_point result;
+  result.value = ((int64_t)x.value) * f / y.value;
+  return result;
 }
 
-
-int add_int_to_fixed(int x, int n)
+fixed_point add_int_to_fixed(fixed_point x, int n)
 {
-  return x + n * f;
+  fixed_point result;
+  result.value = x.value + n * f;
+  return result;
 }
-int sub_int_from_fixed(int x, int n)
+fixed_point sub_int_from_fixed(fixed_point x, int n)
 {
-  return x - n * f;
+  fixed_point result;
+  result.value = x.value - n * f;
+  return result;
 }
-int mult_fixed_by_int(int x, int n)
+fixed_point mult_fixed_by_int(fixed_point x, int n)
 {
-  return x * n;
+  fixed_point result;
+  result.value = x.value * n;
+  return result;
 }
-int div_fixed_by_int(int x, int n)
+fixed_point div_fixed_by_int(fixed_point x, int n)
 {
-  return x / n;
+  fixed_point result;
+  result.value = x.value / n;
+  return result;
 }
