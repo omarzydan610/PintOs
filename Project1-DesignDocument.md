@@ -20,7 +20,7 @@ Please cite any offline or online sources you consulted while preparing your sub
 
 **A1:** Copy here the declaration of each new or changed `struct` or `struct` member, global or static variable, `typedef`, or enumeration. Identify the purpose of each in 25 words or less.
 
-in `thread.c` file there is ```c struct thread``` I will use a sorted data structure `sorted list` that contains wake_tick for each sleeping thread. This data structure should get the minimum wake_tick value in O(1) so that it is fast and doesn't consume time in the `timer_interrupt` function.
+in `thread.c` file there is `c struct thread` I will use a sorted data structure `sorted list` that contains wake_tick for each sleeping thread. This data structure should get the minimum wake_tick value in O(1) so that it is fast and doesn't consume time in the `timer_interrupt` function.
 
 ```c
 struct sleeping_thread {
@@ -36,33 +36,37 @@ struct sleeping_thread {
 
 - In timer_sleep()
 
-    1. disable interrupts
-    2. wake_tick will be calculated by adding timer_ticks() + ticks
-    3. add current thread to sorted sleeping list, with threads ordered by their wake_tick
-    4. call thread_block()
-    5. restore interrupts
+  1. disable interrupts
+  2. wake_tick will be calculated by adding timer_ticks() + ticks
+  3. add current thread to sorted sleeping list, with threads ordered by their wake_tick
+  4. call thread_block()
+  5. restore interrupts
 
 - In timer_interrupt()
-    1. increment ticks
-    2. check if any sleeping thread have reached their wake_tick
-    3. remove all threads that have reached their wake_tick
-    4. unblock these threads using thread_unblock
-    5. call thread_tick()
+
+  1. increment ticks
+  2. check if any sleeping thread have reached their wake_tick
+  3. remove all threads that have reached their wake_tick
+  4. unblock these threads using thread_unblock
+  5. call thread_tick()
 
 **A3:** What steps are taken to minimize the amount of time spent in the timer interrupt handler?
-    - Will use a sorted list to make it efficient to get the threads that should be removed from the sleeping list in O(1)
+
+- Will use a sorted list to make it efficient to get the threads that should be removed from the sleeping list in O(1)
 
 ### SYNCHRONIZATION
 
 **A4:** How are race conditions avoided when multiple threads call timer_sleep() simultaneously?
-    - by disabling interrupts.
-**A5:** How are race conditions avoided when a timer interrupt occurs during a call to timer_sleep()?
-    - by disabling interrupts.
+
+- by disabling interrupts.
+  **A5:** How are race conditions avoided when a timer interrupt occurs during a call to timer_sleep()?
+- by disabling interrupts.
 
 ### RATIONALE
 
 **A6:** Why did you choose this design? In what ways is it superior to another design you considered?
-    - It is the most intuitive and easy and effective design in my opinion and I have not thought of any other approach.
+
+- It is the most intuitive and easy and effective design in my opinion and I have not thought of any other approach.
 
 ## PRIORITY SCHEDULING
 
@@ -94,23 +98,38 @@ struct sleeping_thread {
 
 **C1:** Copy here the declaration of each new or changed `struct` or `struct` member, global or static variable, `typedef`, or enumeration. Identify the purpose of each in 25 words or less.
 
+```c
+//fixedPoint.h
+  typedef struct
+  {
+    int value;
+  } fixed_point; //struct for fixed point operations.
+
+//thread.h
+  int nice;               // Niceness value used in pririty calculations.
+  fixed_point recent_cpu; // Recent CPU usage used in pririty calculations.
+
+//thread.c
+  fixed_point load_avg
+```
+
 ### ALGORITHMS
 
 **C2:** Suppose threads A, B, and C have nice values 0, 1, and 2. Each has a recent_cpu value of 0. Fill in the table below showing the scheduling decision and the priority and recent_cpu values for each thread after each given number of timer ticks:
 
-| timer ticks | recent_cpu |     | priority |     |     | thread |
-| ----------- | ---------- | --- | -------- | --- | --- | ------ |
-|             | A          | B   | C        | A   | B   | C      | to run |
-| 0           |            |     |          |     |     |        |        |
-| 4           |            |     |          |     |     |        |        |
-| 8           |            |     |          |     |     |        |        |
-| 12          |            |     |          |     |     |        |        |
-| 16          |            |     |          |     |     |        |        |
-| 20          |            |     |          |     |     |        |        |
-| 24          |            |     |          |     |     |        |        |
-| 28          |            |     |          |     |     |        |        |
-| 32          |            |     |          |     |     |        |        |
-| 36          |            |     |          |     |     |        |        |
+| timer ticks | recent_cpu |     |     | priority |     |     | thread to run |
+| :---------: | :--------- | --- | --- | -------- | --- | --- | ------------- |
+|             | A          | B   | C   | A        | B   | C   |               |
+|      0      | 0          | 0   | 0   | 63       | 61  | 59  | A             |
+|      4      | 4          | 0   | 0   | 62       | 61  | 59  | A             |
+|      8      | 8          | 0   | 0   | 61       | 61  | 59  | B             |
+|     12      | 8          | 4   | 0   | 61       | 60  | 59  | A             |
+|     16      | 12         | 4   | 0   | 60       | 60  | 59  | B             |
+|     20      | 12         | 8   | 0   | 60       | 59  | 59  | A             |
+|     24      | 16         | 8   | 0   | 59       | 59  | 59  | C             |
+|     28      | 16         | 8   | 4   | 59       | 59  | 58  | B             |
+|     32      | 16         | 12  | 8   | 59       | 59  | 58  | A             |
+|     36      | 20         | 12  | 8   | 58       | 58  | 58  | C             |
 
 **C3:** Did any ambiguities in the scheduler specification make values in the table uncertain? If so, what rule did you use to resolve them? Does this match the behavior of your scheduler?
 
@@ -127,11 +146,7 @@ struct sleeping_thread {
 Answering these questions is optional, but it will help us improve the course in future quarters. Feel free to tell us anything you want--these questions are just to spur your thoughts. You may also choose to respond anonymously in the course evaluations at the end of the quarter.
 
 1. In your opinion, was this assignment, or any one of the three problems in it, too easy or too hard? Did it take too long or too little time?
-
 2. Did you find that working on a particular part of the assignment gave you greater insight into some aspect of OS design?
-
 3. Is there some particular fact or hint we should give students in future quarters to help them solve the problems? Conversely, did you find any of our guidance to be misleading?
-
 4. Do you have any suggestions for the TAs to more effectively assist students, either for future quarters or the remaining projects?
-
 5. Any other comments?
