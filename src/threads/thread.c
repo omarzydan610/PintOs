@@ -41,7 +41,11 @@ static struct lock tid_lock;
 /* List of sleeping threads */
 static struct list sleep_list;
 
-fixed_point load_avg; /* Load average. */
+/*---------Added---------------*/
+#define NICE_MAX 20
+#define NICE_MIN -20
+static fixed_point load_avg; /* Load average. */
+/*---------Added---------------*/
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame
@@ -233,6 +237,13 @@ tid_t thread_create(const char *name, int priority,
 
   /* Initialize thread. */
   init_thread(t, name, priority);
+
+  // if (thread_mlfqs && thread_current() != idle_thread)
+  // {
+  //   t->nice = thread_current()->nice;
+  //   t->recent_cpu = thread_current()->recent_cpu;
+  // }
+
   tid = t->tid = allocate_tid();
 
   /* Stack frame for kernel_thread(). */
@@ -252,6 +263,11 @@ tid_t thread_create(const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock(t);
+
+  if (priority > thread_current()->priority)
+  {
+    thread_yield();
+  }
 
   return tid;
 }
@@ -389,10 +405,15 @@ int thread_get_priority(void)
   return thread_current()->priority;
 }
 
+/*---------Modefied---------------*/
+
 /* Sets the current thread's nice value to NICE. */
 void thread_set_nice(int nice UNUSED)
 {
+  ASSERT(nice <= NICE_MAX && nice >= NICE_MIN);
   thread_current()->nice = nice;
+  calculatePriority(thread_current());
+  thread_yield();
 }
 
 /* Returns the current thread's nice value. */
@@ -412,6 +433,8 @@ int thread_get_load_avg(void)
 {
   return int_round(mult_fixed_by_int(load_avg, 100));
 }
+
+/*---------Modefied---------------*/
 
 /* Idle thread.  Executes when no other thread is ready to run.
 
@@ -500,6 +523,12 @@ init_thread(struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *)t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
+  /*---------Added---------------*/
+  t->nice = 0;
+  t->recent_cpu.value = 0;
+  load_avg.value = 0;
+  /*---------Added---------------*/
 
   old_level = intr_disable();
   list_push_back(&all_list, &t->allelem);
@@ -619,8 +648,12 @@ allocate_tid(void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(struct thread, stack);
 
+/*---------Added---------------*/
+
 void calculatePriority(struct thread *t)
 {
+  ASSERT(t->priority >= PRI_MIN && t->priority <= PRI_MAX);
+  ASSERT(t->nice >= NICE_MIN && t->nice <= NICE_MAX);
   int p = int_floor(sub_int_from_fixed(sub_int_from_fixed(div_fixed_by_int(t->recent_cpu, 4), (t->nice * 2)), PRI_MAX));
   p *= -1;
   if (p < PRI_MIN)
@@ -632,15 +665,43 @@ void calculatePriority(struct thread *t)
 
 void calculateLoadAvg(void)
 {
-  load_avg = add_two_fixed(mult_two_fixed(div_fixed_by_int(convert_to_fixed(59), 60), load_avg), mult_two_fixed(div_fixed_by_int(convert_to_fixed(1), 60), convert_to_fixed(list_size(&ready_list))));
+  int ready_threads = list_size(&ready_list);
+  if (thread_current() != idle_thread)
+  {
+    ready_threads++;
+  }
+  load_avg = add_two_fixed(mult_two_fixed(div_fixed_by_int(convert_to_fixed(59), 60), load_avg), mult_two_fixed(div_fixed_by_int(convert_to_fixed(1), 60), convert_to_fixed(list_size(ready_threads))));
 }
 
 void calculateRecentCpu(struct thread *t)
 {
-  fixed_point recent_cpu = add_int_to_fixed(mult_two_fixed(div_two_fixed((mult_fixed_by_int(load_avg, 2)), (add_int_to_fixed(mult_fixed_by_int(load_avg, 2), 1))), t->recent_cpu), t->nice);
+  ASSERT(t->priority >= PRI_MIN && t->priority <= PRI_MAX);
+  ASSERT(t->nice >= NICE_MIN && t->nice <= NICE_MAX);
+  if (t != idle_thread)
+  {
+    fixed_point recent_cpu = add_int_to_fixed(mult_two_fixed(div_two_fixed((mult_fixed_by_int(load_avg, 2)), (add_int_to_fixed(mult_fixed_by_int(load_avg, 2), 1))), t->recent_cpu), t->nice);
+    t->recent_cpu = recent_cpu;
+  }
 }
 
-void incrementRecentCpu(void)
+void incrementRecentCpu()
 {
-  thread_current()->recent_cpu = add_int_to_fixed(thread_current()->recent_cpu, 1);
+  if (thread_current() != idle_thread)
+  {
+    thread_current()->recent_cpu = add_int_to_fixed(thread_current()->recent_cpu, 1);
+  }
+}
+
+static bool
+comparator(const struct list_elem *a, const struct list_elem *b)
+{
+  struct thread *a_thread = list_entry(a, struct thread, elem);
+  struct thread *b_thread = list_entry(b, struct thread, elem);
+  return a_thread->priority > b_thread->priority;
+}
+
+void updateAllPriorities()
+{
+  thread_foreach(calculatePriority, NULL);
+  list_sort(&ready_list, comparator, NULL);
 }

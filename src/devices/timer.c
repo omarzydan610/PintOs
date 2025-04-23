@@ -158,6 +158,20 @@ void timer_print_stats(void)
   printf("Timer: %" PRId64 " ticks\n", timer_ticks());
 }
 
+void handle_mlfqs(void)
+{
+  incrementRecentCpu();
+  if (ticks % 4 == 0)
+  {
+    updateAllPriorities();
+  }
+  if (ticks % TIMER_FREQ == 0)
+  {
+    calculateLoadAvg();
+    thread_foreach(calculateRecentCpu, NULL);
+  }
+}
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt(struct intr_frame *args UNUSED)
@@ -167,16 +181,7 @@ timer_interrupt(struct intr_frame *args UNUSED)
   thread_tick();
   if (thread_mlfqs)
   {
-    incrementRecentCpu();
-    if (ticks % 4 == 0)
-    {
-      thread_foreach(calculatePriority, NULL);
-    }
-    if (ticks % TIMER_FREQ == 0)
-    {
-      calculateLoadAvg();
-      thread_foreach(calculateRecentCpu, NULL);
-    }
+    handle_mlfqs();
   }
 }
 
