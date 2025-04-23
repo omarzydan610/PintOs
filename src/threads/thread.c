@@ -102,6 +102,7 @@ void thread_init(void)
   list_init(&ready_list);
   list_init(&all_list);
   list_init(&sleep_list);
+  load_avg.value = 0;
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread();
@@ -238,11 +239,6 @@ tid_t thread_create(const char *name, int priority,
   /* Initialize thread. */
   init_thread(t, name, priority);
 
-  // if (thread_mlfqs && thread_current() != idle_thread)
-  // {
-  //   t->nice = thread_current()->nice;
-  //   t->recent_cpu = thread_current()->recent_cpu;
-  // }
 
   tid = t->tid = allocate_tid();
 
@@ -263,11 +259,6 @@ tid_t thread_create(const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock(t);
-
-  if (priority > thread_current()->priority)
-  {
-    thread_yield();
-  }
 
   return tid;
 }
@@ -412,7 +403,7 @@ void thread_set_nice(int nice UNUSED)
 {
   ASSERT(nice <= NICE_MAX && nice >= NICE_MIN);
   thread_current()->nice = nice;
-  calculatePriority(thread_current());
+  calculatePriority(thread_current(), NULL);
   thread_yield();
 }
 
@@ -527,7 +518,6 @@ init_thread(struct thread *t, const char *name, int priority)
   /*---------Added---------------*/
   t->nice = 0;
   t->recent_cpu.value = 0;
-  load_avg.value = 0;
   /*---------Added---------------*/
 
   old_level = intr_disable();
@@ -650,12 +640,11 @@ uint32_t thread_stack_ofs = offsetof(struct thread, stack);
 
 /*---------Added---------------*/
 
-void calculatePriority(struct thread *t)
+void calculatePriority(struct thread *t, void *aux UNUSED)
 {
   ASSERT(t->priority >= PRI_MIN && t->priority <= PRI_MAX);
   ASSERT(t->nice >= NICE_MIN && t->nice <= NICE_MAX);
-  int p = int_floor(sub_int_from_fixed(sub_int_from_fixed(div_fixed_by_int(t->recent_cpu, 4), (t->nice * 2)), PRI_MAX));
-  p *= -1;
+  int p = PRI_MAX - int_floor(div_fixed_by_int(t->recent_cpu, 4)) - t->nice * 2;
   if (p < PRI_MIN)
     p = PRI_MIN;
   else if (p > PRI_MAX)
@@ -670,7 +659,7 @@ void calculateLoadAvg(void)
   {
     ready_threads++;
   }
-  load_avg = add_two_fixed(mult_two_fixed(div_fixed_by_int(convert_to_fixed(59), 60), load_avg), mult_two_fixed(div_fixed_by_int(convert_to_fixed(1), 60), convert_to_fixed(list_size(ready_threads))));
+  load_avg = add_two_fixed(mult_two_fixed(div_fixed_by_int(convert_to_fixed(59), 60), load_avg), mult_fixed_by_int(div_fixed_by_int(convert_to_fixed(1), 60), ready_threads));
 }
 
 void calculateRecentCpu(struct thread *t)
@@ -684,7 +673,7 @@ void calculateRecentCpu(struct thread *t)
   }
 }
 
-void incrementRecentCpu()
+void incrementRecentCpu(void)
 {
   if (thread_current() != idle_thread)
   {
@@ -692,15 +681,14 @@ void incrementRecentCpu()
   }
 }
 
-static bool
-comparator(const struct list_elem *a, const struct list_elem *b)
+bool comparator(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *a_thread = list_entry(a, struct thread, elem);
   struct thread *b_thread = list_entry(b, struct thread, elem);
   return a_thread->priority > b_thread->priority;
 }
 
-void updateAllPriorities()
+void updateAllPriorities(void)
 {
   thread_foreach(calculatePriority, NULL);
   list_sort(&ready_list, comparator, NULL);
