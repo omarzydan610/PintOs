@@ -237,9 +237,25 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  // list_push_back (&ready_list, &t->elem);
+  // printf("before ready list size -> %d\n", list_size(&ready_list));
+  list_insert_ordered(&ready_list, &t->elem, priority_less, NULL); // insert the threads orderd based on the priority
+  // printf("after ready list size -> %d\n", list_size(&ready_list));
   t->status = THREAD_READY;
   intr_set_level (old_level);
+
+  struct thread* cur = thread_current ();
+  char* idle_name = "idle";
+  if(strcmp(cur->name, idle_name) && t->priority > cur->priority)
+  {
+    // printf("cur is %s with prio = %d and t is %s with prio = %d\n",
+    // cur->name,
+    // cur->priority,
+    // t->name,
+    // t->priority
+    // );
+    thread_yield();
+  }
 }
 
 /* Returns the name of the running thread. */
@@ -308,7 +324,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem, priority_less, NULL); // insert the threads orderd based on the priority
+    // list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -336,6 +353,7 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  thread_yield ();
 }
 
 /* Returns the current thread's priority. */
@@ -343,6 +361,12 @@ int
 thread_get_priority (void) 
 {
   return thread_current ()->priority;
+}
+
+int
+get_prority_of_a_thread (struct thread* t)
+{
+  return t->priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -482,6 +506,16 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
+
+bool priority_less (const struct list_elem *a,
+  const struct list_elem *b,
+  void *aux)
+{
+  struct thread* thread_a = list_entry(a, struct thread, elem);
+  struct thread* thread_b = list_entry(b, struct thread, elem);
+  return get_prority_of_a_thread(thread_a) > get_prority_of_a_thread(thread_b);
+}   
+   
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it

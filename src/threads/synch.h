@@ -40,7 +40,8 @@ void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
-
+bool
+priority_less_cond(struct list_elem* a, struct list_elem* b, void* aux);
 /* Optimization barrier.
 
    The compiler will not reorder operations across an
