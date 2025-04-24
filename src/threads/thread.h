@@ -160,7 +160,7 @@ void calculateLoadAvg(void);
 void calculateRecentCpu(struct thread *t);
 void incrementRecentCpu(void);
 void updateAllPriorities(void);
-bool comparator(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool priority_less(const struct list_elem *a, const struct list_elem *b, void *aux);
 /*---------Added---------------*/
 
 #endif /* threads/thread.h */

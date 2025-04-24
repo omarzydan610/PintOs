@@ -161,14 +161,14 @@ void timer_print_stats(void)
 void handle_mlfqs(void)
 {
   incrementRecentCpu();
-  if (ticks % 4 == 0)
-  {
-    updateAllPriorities();
-  }
   if (ticks % TIMER_FREQ == 0)
   {
     calculateLoadAvg();
     thread_foreach(calculateRecentCpu, NULL);
+  }
+  if (ticks % 4 == 0)
+  {
+    updateAllPriorities();
   }
 }
 

@@ -239,7 +239,6 @@ tid_t thread_create(const char *name, int priority,
   /* Initialize thread. */
   init_thread(t, name, priority);
 
-
   tid = t->tid = allocate_tid();
 
   /* Stack frame for kernel_thread(). */
@@ -286,6 +285,7 @@ void thread_block(void)
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
    update other data. */
+
 void thread_unblock(struct thread *t)
 {
   enum intr_level old_level;
@@ -294,9 +294,26 @@ void thread_unblock(struct thread *t)
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
-  list_push_back(&ready_list, &t->elem);
+  // list_push_back (&ready_list, &t->elem);
+  // printf("before ready list size -> %d\n", list_size(&ready_list));
+  calculatePriority(t, NULL);
+  list_insert_ordered(&ready_list, &t->elem, priority_less, NULL); // insert the threads orderd based on the priority
+  // printf("after ready list size -> %d\n", list_size(&ready_list));
   t->status = THREAD_READY;
   intr_set_level(old_level);
+
+  struct thread *cur = thread_current();
+  char *idle_name = "idle";
+  if (strcmp(cur->name, idle_name) && t->priority > cur->priority && !intr_context())
+  {
+    // printf("cur is %s with prio = %d and t is %s with prio = %d\n",
+    // cur->name,
+    // cur->priority,
+    // t->name,
+    // t->priority
+    // );
+    thread_yield();
+  }
 }
 
 /* Returns the name of the running thread. */
@@ -362,7 +379,8 @@ void thread_yield(void)
 
   old_level = intr_disable();
   if (cur != idle_thread)
-    list_push_back(&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem, priority_less, NULL); // insert the threads orderd based on the priority
+  // list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule();
   intr_set_level(old_level);
@@ -388,6 +406,10 @@ void thread_foreach(thread_action_func *func, void *aux)
 void thread_set_priority(int new_priority)
 {
   thread_current()->priority = new_priority;
+  if (thread_mlfqs)
+  {
+    list_sort(&ready_list, priority_less, NULL);
+  }
 }
 
 /* Returns the current thread's priority. */
@@ -551,7 +573,6 @@ next_thread_to_run(void)
   else
     return list_entry(list_pop_front(&ready_list), struct thread, elem);
 }
-
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
 
@@ -681,15 +702,17 @@ void incrementRecentCpu(void)
   }
 }
 
-bool comparator(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+bool priority_less(const struct list_elem *a,
+                   const struct list_elem *b,
+                   void *aux)
 {
-  struct thread *a_thread = list_entry(a, struct thread, elem);
-  struct thread *b_thread = list_entry(b, struct thread, elem);
-  return a_thread->priority > b_thread->priority;
+  struct thread *thread_a = list_entry(a, struct thread, elem);
+  struct thread *thread_b = list_entry(b, struct thread, elem);
+  return thread_a->priority > thread_b->priority;
 }
 
 void updateAllPriorities(void)
 {
   thread_foreach(calculatePriority, NULL);
-  list_sort(&ready_list, comparator, NULL);
+  list_sort(&ready_list, priority_less, NULL);
 }
