@@ -4,6 +4,12 @@
 #include <list.h>
 #include <stdbool.h>
 
+struct donation {
+  int priority;
+  struct lock *lock;
+  struct list_elem elem;
+};
+
 /* A counting semaphore. */
 struct semaphore 
   {
@@ -23,7 +29,11 @@ struct lock
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
   };
-
+  struct donated_priority {
+    int priority;           // The donated priority value.
+    struct thread *donor;   // The thread that donated the priority.
+    struct list_elem elem;  // The list element (used to link the donated_priority struct in a list).
+};
 void lock_init (struct lock *);
 void lock_acquire (struct lock *);
 bool lock_try_acquire (struct lock *);

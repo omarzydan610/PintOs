@@ -89,6 +89,9 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    int original_priority;
+    struct list donated_priorities;             /* List of locks held by the thread. */
+    struct lock *waiting_on_lock;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
