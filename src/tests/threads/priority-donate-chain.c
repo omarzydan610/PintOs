@@ -64,6 +64,7 @@ test_priority_donate_chain (void)
       char name[16];
       int thread_priority;
 
+    
       snprintf (name, sizeof name, "thread %d", i);
       thread_priority = PRI_MIN + i * 3;
       lock_pairs[i].first = i < NESTING_DEPTH - 1 ? locks + i: NULL;
@@ -86,6 +87,7 @@ static void
 donor_thread_func (void *locks_) 
 {
   struct lock_pair *locks = locks_;
+  // printf("--thread %s started with priority %d\n", thread_name (), thread_get_priority ());
 
   if (locks->first)
     lock_acquire (locks->first);

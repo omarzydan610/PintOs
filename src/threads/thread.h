@@ -82,14 +82,18 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 struct thread
-{
-   /* Owned by thread.c. */
-   tid_t tid;                 /* Thread identifier. */
-   enum thread_status status; /* Thread state. */
-   char name[16];             /* Name (for debugging purposes). */
-   uint8_t *stack;            /* Saved stack pointer. */
-   int priority;              /* Priority. */
-   struct list_elem allelem;  /* List element for all threads list. */
+
+  {
+    /* Owned by thread.c. */
+    tid_t tid;                          /* Thread identifier. */
+    enum thread_status status;          /* Thread state. */
+    char name[16];                      /* Name (for debugging purposes). */
+    uint8_t *stack;                     /* Saved stack pointer. */
+    int priority;                       /* Priority. */
+    struct list_elem allelem;           /* List element for all threads list. */
+    int original_priority;
+    struct list donated_priorities;             /* List of locks held by the thread. */
+    struct lock *waiting_on_lock;
 
    int nice;               /* Niceness value. */
    fixed_point recent_cpu; /* Recent CPU usage for advanced scheduler. */
@@ -106,7 +110,7 @@ struct thread
    unsigned magic; /* Detects stack overflow. */
 };
 
-/* If false (default), use round-robin scheduler.
+/* If false (default), use round-robin r.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
@@ -146,21 +150,20 @@ void thread_yield(void);
 typedef void thread_action_func(struct thread *t, void *aux);
 void thread_foreach(thread_action_func *, void *);
 
-int thread_get_priority(void);
-void thread_set_priority(int);
+int thread_get_priority (void);
+void thread_set_priority (int);
+int get_prority_of_a_thread(struct thread*);
 
 int thread_get_nice(void);
 void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
-/*---------Added---------------*/
 void calculatePriority(struct thread *t, void *aux UNUSED);
 void calculateLoadAvg(void);
 void calculateRecentCpu(struct thread *t);
 void incrementRecentCpu(void);
 void updateAllPriorities(void);
 bool priority_less(const struct list_elem *a, const struct list_elem *b, void *aux);
-/*---------Added---------------*/
 
 #endif /* threads/thread.h */
