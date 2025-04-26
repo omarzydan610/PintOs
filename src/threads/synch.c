@@ -216,6 +216,7 @@ lock_acquire (struct lock *lock)
   /* Acquire the lock */
   sema_down(&lock->semaphore);
   lock->holder = current;
+  // current->waiting_on_lock = NULL;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
