@@ -3,7 +3,7 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "process.c"
+#include "threads/vaddr.h"
 #include "devices/shutdown.h"
 
 static void syscall_handler(struct intr_frame *);
@@ -66,8 +66,8 @@ syscall_handler(struct intr_frame *f)
   case SYS_CLOSE:
     // implement close syscall
     break;
-  default:
-    exit(-1);
+  //! default:
+    //! exit(-1);
   }
   thread_exit();
 }
@@ -77,13 +77,13 @@ void verify_esp(void *esp)
   // Check if esp is within the valid range
   if (esp < (int *)0x08048000 || esp >= (int *)PHYS_BASE)
   {
-    exit(-1);   
+    //! exit(-1);   
   }
   // Check if esp is aligned to a page boundary
   void *ptr = pagedir_get_page(thread_current()->pagedir, esp);
   if (ptr == NULL)
   {
-    exit(-1);
+    //! exit(-1);
   }
 }
 
@@ -117,8 +117,8 @@ int get_number_of_args(int syscall_number)
     return 1;
   case SYS_CLOSE:
     return 1;
-  default:
-    exit(-1);
+  //! default:
+    //! exit(-1);
   }
 }
 
