@@ -96,6 +96,11 @@ struct thread
 
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    /* Huthaifa for userprog*/
+    struct thread *parent;
+    struct list children;
+    struct list_elem child_elem;
+    int exit_status;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

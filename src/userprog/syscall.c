@@ -31,7 +31,7 @@ syscall_handler(struct intr_frame *f)
     shutdown_power_off();
     break;
   case SYS_EXIT:
-    // implement exit syscall
+    sys_exit(args[0]);
     break;
   case SYS_EXEC:
     // implement exec syscall
@@ -66,24 +66,25 @@ syscall_handler(struct intr_frame *f)
   case SYS_CLOSE:
     // implement close syscall
     break;
-  //! default:
-    //! exit(-1);
+  default:
+    sys_exit(-1);
   }
   thread_exit();
 }
 
-void verify_esp(void *esp)
+void 
+verify_esp(void *esp)
 {
   // Check if esp is within the valid range
   if (esp < (int *)0x08048000 || esp >= (int *)PHYS_BASE)
   {
-    //! exit(-1);   
+    sys_exit(-1);   
   }
   // Check if esp is aligned to a page boundary
   void *ptr = pagedir_get_page(thread_current()->pagedir, esp);
   if (ptr == NULL)
   {
-    //! exit(-1);
+    sys_exit(-1);
   }
 }
 
@@ -117,16 +118,29 @@ int get_number_of_args(int syscall_number)
     return 1;
   case SYS_CLOSE:
     return 1;
-  //! default:
-    //! exit(-1);
+  default:
+    sys_exit(-1);
   }
 }
 
-void load_args(void *esp, int *args, int numberOfArgs)
+void 
+load_args(void *esp, int *args, int numberOfArgs)
 {
   for (int i = 0; i < numberOfArgs; i++)
   {
     verify_esp(esp + (i + 1) * sizeof(int));
     args[i] = *(int *)(esp + (i + 1) * sizeof(int));
   }
+}
+
+void
+sys_exit(int status)
+{
+  struct thread *current_thread = thread_current();
+  current_thread->exit_status = status;
+
+  printf("%s: exit(%d)\n", thread_current()->name, status);
+
+
+  thread_exit();
 }
