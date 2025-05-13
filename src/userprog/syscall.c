@@ -5,12 +5,19 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
+#include "threads/synch.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
+// #include "lib/kernel/console.c"
 
 static void syscall_handler(struct intr_frame *);
+struct lock fs_lock;
+
 
 void syscall_init(void)
 {
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init(&fs_lock);
 }
 
 static void
@@ -37,7 +44,7 @@ syscall_handler(struct intr_frame *f)
     // implement exec syscall
     break;
   case SYS_WAIT:
-    // implement wait syscall
+    process_wait();
     break;
   case SYS_CREATE:
     // implement create syscall
@@ -46,22 +53,22 @@ syscall_handler(struct intr_frame *f)
     // implement remove syscall
     break;
   case SYS_OPEN:
-    // implement open syscall
+    sys_file_open(args, f);
     break;
   case SYS_FILESIZE:
-    // implement filesize syscall
+    sys_file_size(args, f);
     break;
   case SYS_READ:
     // implement read syscall
     break;
   case SYS_WRITE:
-    // implement write syscall
+    sys_file_write(args, f);
     break;
   case SYS_SEEK:
-    // implement seek syscall
+    sys_file_seek(args);
     break;
   case SYS_TELL:
-    // implement tell syscall
+    sys_file_tell(args, f);
     break;
   case SYS_CLOSE:
     // implement close syscall
@@ -143,4 +150,98 @@ sys_exit(int status)
 
 
   thread_exit();
+}
+
+struct file* get_file(int fd){
+  struct thread* t = thread_current ();
+  struct file* cur_file = t->files[fd];
+  if(cur_file == NULL)
+    sys_exit(-1);
+  return cur_file;
+}
+
+void
+sys_file_open (int* args, struct intr_frame* f){
+
+  char* empty_str = "";
+  if(args[0] == NULL || !strcmp((const char*) args[0], empty_str))
+    sys_exit(-1);
+
+  lock_acquire (&fs_lock);
+  struct file* opened_file = filesys_open ((const char*) args[0]);
+  lock_release (&fs_lock);
+  if(opened_file != NULL)
+  {
+    struct thread* t = thread_current ();
+    t->files[t->files_cnt] = opened_file;
+    f->eax = t->files_cnt++;
+  } else 
+      f->eax = -1;
+}
+
+void sys_file_write (int* args, struct intr_frame* f){
+  int fd = args[0], written_bytes = args[2];
+
+  if(fd == 0 || fd == 1 || fd == 2)
+    handle_sys_files (fd, (const char*) args[1], (size_t) args[2]);
+  
+  struct file* cur_file = get_file(fd);
+
+  lock_acquire (&fs_lock);
+  written_bytes = file_write (cur_file,(const char *) args[1],(off_t) args[2]);
+  lock_release (&fs_lock);
+
+  f->eax = written_bytes;
+}
+
+void
+handle_sys_files (int fd, const char* buffer, off_t size){
+  if(fd == 1)
+     putbuf (buffer, size);
+  else
+    sys_exit(-1);
+}
+
+
+void
+sys_file_seek (int* args){
+  int fd = args[0];
+  if(fd < 3)
+    sys_exit(-1);
+
+  struct file* cur_file = get_file(fd);
+
+  lock_acquire(&fs_lock);
+  file_seek(cur_file, (off_t) args[1]);
+  lock_release(&fs_lock);
+}
+
+void
+sys_file_tell (int* args, struct intr_frame* f){
+  int fd = args[0];
+  if(fd < 3)
+    sys_exit(-1);
+
+  struct file* cur_file = get_file(fd);
+
+  lock_acquire(&fs_lock);
+  off_t off = file_tell(cur_file);
+  lock_release(&fs_lock);
+
+  f->eax = off;
+}
+
+int
+sys_file_size (int* args, struct intr_frame* f){
+  int fd = args[0];
+  if(fd < 3)
+    sys_exit(-1);
+
+  struct file* cur_file = get_file(fd);
+  
+  lock_acquire(&fs_lock);
+  off_t off = file_length(cur_file);
+  lock_release(&fs_lock);
+
+  f->eax = off;
 }

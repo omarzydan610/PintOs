@@ -99,6 +99,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+	while(true);
 	return -1;
 }
 
@@ -252,6 +253,9 @@ load (const char *file_name, void (**eip) (void), void **esp, char **save_ptr)
 			|| ehdr.e_phnum > 1024)
 	{
 		printf ("load: %s: error loading executable\n", file_name);
+		// printf("ELF checks: magic=%d, type=%d, machine=%d, version=%d, phentsize=%d, phnum=%d\n",
+		// 	memcmp(ehdr.e_ident, "\177ELF\1\1\1", 7), ehdr.e_type, ehdr.e_machine,
+		// 	ehdr.e_version, ehdr.e_phentsize, ehdr.e_phnum);
 		goto done;
 	}
 

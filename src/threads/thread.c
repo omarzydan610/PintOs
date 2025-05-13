@@ -204,6 +204,7 @@ thread_create (const char *name, int priority,
 	sf->eip = switch_entry;
 	sf->ebp = 0;
 
+	t->files_cnt = 3;
 	intr_set_level (old_level);
 
 	/* Add to run queue. */

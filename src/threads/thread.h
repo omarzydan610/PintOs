@@ -102,6 +102,10 @@ struct thread
     struct list_elem child_elem;
     int exit_status;
 
+   /* files the process ownes */
+   int files_cnt;
+   struct file* files[128];
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
