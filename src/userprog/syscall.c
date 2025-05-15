@@ -47,10 +47,10 @@ syscall_handler(struct intr_frame *f)
     process_wait();
     break;
   case SYS_CREATE:
-    // implement create syscall
+    sys_file_create(args, f);
     break;
   case SYS_REMOVE:
-    // implement remove syscall
+    sys_file_remove(args, f);
     break;
   case SYS_OPEN:
     sys_file_open(args, f);
@@ -244,4 +244,28 @@ sys_file_size (int* args, struct intr_frame* f){
   lock_release(&fs_lock);
 
   f->eax = off;
+}
+
+void
+sys_file_remove (int* args, struct intr_frame* f){
+  char* empty_str = "";
+  if(args[0] == NULL || !strcmp((const char*) args[0], empty_str))
+    sys_exit(-1);
+
+  lock_acquire (&fs_lock);
+  bool success = filesys_remove ((const char*) args[0]);
+  lock_release (&fs_lock);
+  f->eax = success;
+}
+
+void
+sys_file_create (int* args, struct intr_frame* f){
+  char* empty_str = "";
+  if(args[0] == NULL || !strcmp((const char*) args[0], empty_str))
+    sys_exit(-1);
+
+  lock_acquire (&fs_lock);
+  bool success = filesys_create ((const char*) args[0], (off_t) args[1]);
+  lock_release (&fs_lock);
+  f->eax = success;
 }
