@@ -7,6 +7,8 @@
 #include "devices/shutdown.h"
 
 static void syscall_handler(struct intr_frame *);
+void sys_exit(int status);
+static int sys_exec(const char* cmd_line);
 
 void syscall_init(void)
 {
@@ -34,7 +36,8 @@ syscall_handler(struct intr_frame *f)
     sys_exit(args[0]);
     break;
   case SYS_EXEC:
-    // implement exec syscall
+    f->eax = sys_exec((const char*)args[0]);
+    return;
     break;
   case SYS_WAIT:
     // implement wait syscall
@@ -69,7 +72,6 @@ syscall_handler(struct intr_frame *f)
   default:
     sys_exit(-1);
   }
-  thread_exit();
 }
 
 void 
@@ -120,6 +122,7 @@ int get_number_of_args(int syscall_number)
     return 1;
   default:
     sys_exit(-1);
+    return -1;
   }
 }
 
@@ -143,4 +146,26 @@ sys_exit(int status)
 
 
   thread_exit();
+}
+
+static int
+sys_exec(const char* cmd_line)
+{
+  if (cmd_line == NULL)
+    sys_exit(-1);
+
+  for (const char *c = cmd_line; *c != '\0'; c++)
+  {
+    if (!is_user_vaddr((const void *)c))
+      sys_exit(-1);
+    verify_esp ((void *)c);
+  }  
+  
+  //!   // Make sure the string is accessible
+  //! char *str = pagedir_get_page(thread_current()->pagedir, cmd_line);
+  //! if (str == NULL)
+  //!   return -1;
+  
+  tid_t tid = process_execute(cmd_line);
+  return tid;
 }
