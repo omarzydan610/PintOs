@@ -166,6 +166,7 @@ tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux)
 {
+	struct thread *parent = thread_current();
 	struct thread *t;
 	struct kernel_thread_frame *kf;
 	struct switch_entry_frame *ef;
@@ -183,7 +184,6 @@ thread_create (const char *name, int priority,
 	/* Initialize thread. */
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
-
 	/* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
@@ -205,8 +205,11 @@ thread_create (const char *name, int priority,
 	sf->ebp = 0;
 
 	t->files_cnt = 3;
+	
+	list_push_back(&thread_current()->children,&t->child_elem);
+	t->parent = thread_current();
+	
 	intr_set_level (old_level);
-
 	/* Add to run queue. */
 	thread_unblock (t);
 
@@ -460,6 +463,7 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
+
 	enum intr_level old_level;
 
 	ASSERT (t != NULL);
@@ -473,9 +477,23 @@ init_thread (struct thread *t, const char *name, int priority)
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
+	sema_init(&t->sync_lock,0);
+	list_init(&t->children);
+
 	old_level = intr_disable ();
 	list_push_back (&all_list, &t->allelem);
 	intr_set_level (old_level);
+}
+struct thread* get_thread_by_tid(tid_t tid){
+	struct thread* current = thread_current();
+    struct list_elem *e;
+    
+    for (e = list_begin(&current->children); e != list_end(&current->children); e = list_next(e)) {
+        struct thread *child = list_entry(e, struct thread, child_elem);
+        if (child->tid == tid)
+            return child;
+    }
+    return NULL;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

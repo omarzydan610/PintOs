@@ -11,6 +11,8 @@
 // #include "lib/kernel/console.c"
 
 static void syscall_handler(struct intr_frame *);
+void sys_exit(int status);
+static int sys_exec(const char* cmd_line);
 struct lock fs_lock;
 
 
@@ -34,17 +36,18 @@ syscall_handler(struct intr_frame *f)
 
   switch (syscall_number)
   {
-  case SYS_HALT:
+    case SYS_HALT:
     shutdown_power_off();
     break;
   case SYS_EXIT:
     sys_exit(args[0]);
     break;
   case SYS_EXEC:
-    // implement exec syscall
+    f->eax = sys_exec((const char*)args[0]);
+    return;
     break;
   case SYS_WAIT:
-    process_wait();
+    f->eax = process_wait(args[0]);
     break;
   case SYS_CREATE:
     sys_file_create(args, f);
@@ -268,4 +271,27 @@ sys_file_create (int* args, struct intr_frame* f){
   bool success = filesys_create ((const char*) args[0], (off_t) args[1]);
   lock_release (&fs_lock);
   f->eax = success;
+}
+
+
+static int
+sys_exec(const char* cmd_line)
+{
+  if (cmd_line == NULL)
+    sys_exit(-1);
+
+  for (const char *c = cmd_line; *c != '\0'; c++)
+  {
+    if (!is_user_vaddr((const void *)c))
+      sys_exit(-1);
+    verify_esp ((void *)c);
+  }  
+  
+  //!   // Make sure the string is accessible
+  //! char *str = pagedir_get_page(thread_current()->pagedir, cmd_line);
+  //! if (str == NULL)
+  //!   return -1;
+  
+  tid_t tid = process_execute(cmd_line);
+  return tid;
 }

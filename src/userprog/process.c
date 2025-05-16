@@ -47,8 +47,13 @@ process_execute (const char *file_name)
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
+	else{
+		// struct thread* child = get_thread_by_tid(tid);
+		sema_down(&thread_current()->sync_lock);
+	}
 	return tid;
 }
 
@@ -72,10 +77,19 @@ start_process (void *file_name_)
 	if_.eflags = FLAG_IF | FLAG_MBS;
 	success = load (file_name, &if_.eip, &if_.esp, &save_ptr);
 
+	struct thread *current_thread = thread_current();
+	struct thread *parent = current_thread->parent;
 	/* If load failed, quit. */
+	
 	palloc_free_page (file_name);
-	if (!success)
+	if (!success){	
+		sema_up(&parent->sync_lock);
 		thread_exit ();
+	}
+	else {
+		sema_up(&parent->sync_lock);
+		sema_down(&current_thread->sync_lock);
+	}
 
 	/* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -97,10 +111,21 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-	while(true);
-	return -1;
+	struct thread *current_thread = thread_current();
+	struct thread* child = get_thread_by_tid(child_tid);
+
+
+	if (child == NULL) return -1;
+	if (current_thread->wait_on == child_tid) return -1;
+	
+	current_thread->wait_on = child_tid;
+	
+	sema_up(&child->sync_lock);
+	sema_down(&current_thread->sync_lock);
+	
+	return child->exit_status;
 }
 
 /* Free the current process's resources. */
@@ -125,6 +150,10 @@ process_exit (void)
 		cur->pagedir = NULL;
 		pagedir_activate (NULL);
 		pagedir_destroy (pd);
+	}
+	if (cur->parent && cur->parent->wait_on == cur->tid){
+		cur->parent->wait_on = -2 ;
+		sema_up(&cur->parent->sync_lock);
 	}
 }
 
