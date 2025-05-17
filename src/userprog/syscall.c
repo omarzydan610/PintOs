@@ -51,7 +51,6 @@ syscall_handler(struct intr_frame *f)
     break;
   case SYS_EXEC:
     f->eax = sys_exec((const char *)args[0]);
-    return;
     break;
   case SYS_WAIT:
     f->eax = process_wait(args[0]);
@@ -373,12 +372,12 @@ static int
 sys_exec(const char *cmd_line)
 {
   if (cmd_line == NULL)
-    sys_exit(-1);
+    return -1;
 
   for (const char *c = cmd_line; *c != '\0'; c++)
   {
     if (!is_user_vaddr((const void *)c))
-      sys_exit(-1);
+      return -1;
     verify_esp((void *)c);
   }
 
@@ -387,6 +386,7 @@ sys_exec(const char *cmd_line)
   //! if (str == NULL)
   //!   return -1;
 
+  // printf("in sys_exec cmd_file: %s", cmd_line);
   tid_t tid = process_execute(cmd_line);
   return tid;
 }
