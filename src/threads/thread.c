@@ -206,7 +206,7 @@ thread_create (const char *name, int priority,
 
 	t->files_cnt = SYSTEM_FILES;
 	
-	list_push_back(&thread_current()->children,&t->child_elem);
+	list_push_back(&thread_current()->children, &t->child_elem);
 	t->parent = thread_current();
 	
 	intr_set_level (old_level);
@@ -463,7 +463,6 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
-
 	enum intr_level old_level;
 
 	ASSERT (t != NULL);
@@ -484,6 +483,7 @@ init_thread (struct thread *t, const char *name, int priority)
 	list_push_back (&all_list, &t->allelem);
 	intr_set_level (old_level);
 }
+
 struct thread* get_thread_by_tid(tid_t tid){
 	struct thread* current = thread_current();
     struct list_elem *e;
