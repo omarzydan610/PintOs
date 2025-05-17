@@ -108,7 +108,7 @@ thread_start (void)
 	/* Create the idle thread. */
 	struct semaphore idle_started;
 	sema_init (&idle_started, 0);
-	thread_create ("idle", PRI_MIN, idle, &idle_started);
+	thread_create ("idle", PRI_MIN, idle, &idle_started, NULL);
 
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
@@ -164,7 +164,7 @@ thread_print_stats (void)
    Priority scheduling is the goal of Problem 1-3. */
 tid_t
 thread_create (const char *name, int priority,
-		thread_func *function, void *aux)
+		thread_func *function, void *aux, struct file *executable)
 {
 	struct thread *parent = thread_current();
 	struct thread *t;
@@ -208,7 +208,7 @@ thread_create (const char *name, int priority,
 	
 	list_push_back(&thread_current()->children, &t->child_elem);
 	t->parent = thread_current();
-	
+	t->executable = executable;
 	intr_set_level (old_level);
 	/* Add to run queue. */
 	thread_unblock (t);

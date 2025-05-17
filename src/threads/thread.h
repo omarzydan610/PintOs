@@ -109,7 +109,8 @@ struct thread
     struct list_elem child_elem;
     int exit_status;
     int child_exit_status;
-
+    struct file *executable;
+   
     struct semaphore sync_lock;
     tid_t wait_on; 
 
@@ -133,7 +134,7 @@ void thread_tick (void);
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
-tid_t thread_create (const char *name, int priority, thread_func *, void *);
+tid_t thread_create (const char *name, int priority, thread_func *, void *, struct file *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);

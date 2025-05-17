@@ -183,8 +183,12 @@ void sys_exit(int status)
 {
   struct thread *current_thread = thread_current();
   current_thread->exit_status = status;
-
-  printf("%s: exit(%d)\n", thread_current()->name, status);
+  if (current_thread->executable != NULL)
+  {
+    file_allow_write(current_thread->executable);
+    file_close(current_thread->executable);
+  }
+  printf("%s: exit(%d)\n", current_thread->name, status);
   thread_exit();
 }
 
