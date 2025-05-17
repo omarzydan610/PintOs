@@ -41,16 +41,24 @@ process_execute (const char *file_name)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	// Create a copy for parsing the file name
+	char *name_copy = palloc_get_page(0);
+	if (name_copy == NULL) {
+		palloc_free_page(fn_copy);
+		return TID_ERROR;
+	}
+	strlcpy(name_copy, file_name, PGSIZE);
+
 	/* Parsed file name */
 	char *save_ptr;
-	file_name = strtok_r((char *) file_name, " ", &save_ptr);
+	char *executable_name = strtok_r(name_copy, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+	tid = thread_create (executable_name, PRI_DEFAULT, start_process, fn_copy);
 
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
-	else{
+	else {
 		// struct thread* child = get_thread_by_tid(tid);
 		sema_down(&thread_current()->sync_lock);
 	}
@@ -153,6 +161,7 @@ process_exit (void)
 	}
 	if (cur->parent && cur->parent->wait_on == cur->tid){
 		cur->parent->wait_on = -2 ;
+		// printf("%s sema up line 156", cur->parent->name);
 		sema_up(&cur->parent->sync_lock);
 	}
 }
