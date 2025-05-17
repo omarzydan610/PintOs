@@ -84,7 +84,7 @@ syscall_handler(struct intr_frame *f)
     // implement close syscall
     break;
   default:
-    sys_exit(-88);
+    sys_exit(-1);
   }
   // printf("syscall handler finished : %d", syscall_number);
 }
@@ -158,7 +158,7 @@ struct file *my_get_file(int fd, const char *caller_name)
   struct thread *t = thread_current();
   struct open_file *cur_file = t->files[fd];
   if (cur_file == NULL)
-    sys_exit(-172);
+    sys_exit(-1);
   return cur_file->file_ptr;
 }
 
@@ -167,20 +167,30 @@ void sys_file_open(int *args, struct intr_frame *f)
 
   const char *empty_str = "", *file_name = (const char *)args[0];
   // printf("file open is called file name is : %s\n", file_name);
-  if (file_name == NULL || !strcmp((file_name, empty_str)))
+  if (file_name == NULL)
     sys_exit(-1);
-
+  else if(!strcmp(file_name, empty_str))
+  {
+    f->eax = -1;
+    return;
+  }
+  
+  // printf("file name is empty\n file name : %s\n", file_name);
+  // printf("reached here in open -> 1 file name is : %s\n", file_name);
   lock_acquire(&fs_lock);
   struct file *opened_file = filesys_open(file_name);
   lock_release(&fs_lock);
+  // printf("reached here in open -> 2 file name is : %s and there's a file opened = %d\n", file_name, opened_file != NULL);
+
   if (opened_file != NULL)
   {
     struct thread *t = thread_current();
     struct open_file *file = (struct open_file *)malloc(sizeof(struct open_file));
-    file->file_ptr = &opened_file;
+    file->file_ptr = opened_file;
     file->name = file_name;
     t->files[t->files_cnt] = file;
     f->eax = t->files_cnt++;
+    // printf("reached here in open -> 2 file name is : %s returned fd is : %d\n", file_name, t->files_cnt - 1);
   }
   else
   {
@@ -192,9 +202,14 @@ void sys_file_write(int *args, struct intr_frame *f)
 {
   int fd = args[0], written_bytes = args[2];
 
+  if(fd < 0 || fd >= MAX_FILES_PER_PROCESS){
+    f->eax = 0;
+    return;
+  }
+
   if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO)
   {
-    handle_sys_files(fd, (const char *)args[1], (size_t)args[2]);
+    handle_sys_files(fd, (const char *) args[1], (size_t)args[2]);
     f->eax = written_bytes;
     // printf("write finish\n");
     return;
@@ -204,10 +219,9 @@ void sys_file_write(int *args, struct intr_frame *f)
   struct file *cur_file = my_get_file(fd, name);
 
   lock_acquire(&fs_lock);
-  written_bytes = file_write(cur_file, (const char *)args[1], (off_t)args[2]);
+  f->eax = file_write(cur_file, (const void *)args[1], (off_t)args[2]);
   lock_release(&fs_lock);
 
-  f->eax = written_bytes;
 }
 
 void handle_sys_files(int fd, const char *buffer, off_t size)
@@ -219,7 +233,7 @@ void handle_sys_files(int fd, const char *buffer, off_t size)
     // printf("putuf returned\n");
   }
   else
-    sys_exit(-227);
+    sys_exit(-1);
 }
 
 void sys_file_seek(int *args)
@@ -240,7 +254,7 @@ void sys_file_tell(int *args, struct intr_frame *f)
 {
   int fd = args[0];
   if (fd < SYSTEM_FILES)
-    sys_exit(-1);
+    sys_exit(-252);
 
   const char *name = "sys tell";
   struct file *cur_file = my_get_file(fd, name);
@@ -301,8 +315,14 @@ void remove_file_from_table(const char *name)
 void sys_file_create(int *args, struct intr_frame *f)
 {
   char *empty_str = "";
-  if (args[0] == NULL || strlen((char *)args[0]) > MAX_FILE_NAME_LENGTH || !strcmp((const char *)args[0], empty_str))
+  if (args[0] == NULL || !strcmp((const char *)args[0], empty_str)) 
     sys_exit(-1);
+    
+  if(strlen((char *)args[0]) > MAX_FILE_NAME_LENGTH)
+  {
+    f->eax = 0;
+    return;
+  }
 
   lock_acquire(&fs_lock);
   bool success = filesys_create((const char *)args[0], (off_t)args[1]);
@@ -315,6 +335,15 @@ void sys_file_read(int *args, struct intr_frame *f)
   int fd = args[0];
   const void *buffer = (const void *)args[1];
   unsigned length = args[2];
+  if(fd == NULL || buffer == NULL || length == NULL){
+    f->eax = 0;
+    return;
+  }
+
+  if(fd < 0 || fd >= MAX_FILES_PER_PROCESS){
+    f->eax = 0;
+    return;
+  }
 
   if (fd < SYSTEM_FILES)
     handle_read_from_system_files(fd, buffer, length);
