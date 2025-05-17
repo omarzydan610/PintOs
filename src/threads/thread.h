@@ -24,7 +24,8 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
+#define MAX_FILES_PER_PROCESS 128
+#define SYSTEM_FILES 3
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -81,6 +82,11 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+struct open_file {
+   struct file* file_ptr;
+   const char* name;
+};
 struct thread
   {
     /* Owned by thread.c. */
@@ -108,7 +114,7 @@ struct thread
 
    /* files the process ownes */
    int files_cnt;
-   struct file* files[128];
+   struct open_file* files[MAX_FILES_PER_PROCESS];
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
@@ -149,5 +155,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void repair_file_table(struct thread*);
 
 #endif /* threads/thread.h */
