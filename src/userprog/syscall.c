@@ -411,7 +411,6 @@ int handle_read_from_system_files(int fd, void *buffer, unsigned length)
 static int
 sys_exec(const char *cmd_line)
 {
-
   tid_t tid = process_execute(cmd_line);
   return tid;
 }
