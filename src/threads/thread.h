@@ -108,6 +108,7 @@ struct thread
     struct list children;
     struct list_elem child_elem;
     int exit_status;
+    int child_exit_status;
 
     struct semaphore sync_lock;
     tid_t wait_on; 

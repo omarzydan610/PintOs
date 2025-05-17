@@ -126,14 +126,13 @@ process_wait (tid_t child_tid)
 
 
 	if (child == NULL) return -1;
-	if (current_thread->wait_on == child_tid) return -1;
 	
 	current_thread->wait_on = child_tid;
 	
 	sema_up(&child->sync_lock);
 	sema_down(&current_thread->sync_lock);
 	
-	return child->exit_status;
+	return current_thread->child_exit_status;
 }
 
 /* Free the current process's resources. */
@@ -160,8 +159,9 @@ process_exit (void)
 		pagedir_destroy (pd);
 	}
 	if (cur->parent && cur->parent->wait_on == cur->tid){
+		cur->parent->child_exit_status = cur->exit_status;
 		cur->parent->wait_on = -2 ;
-		// printf("%s sema up line 156", cur->parent->name);
+		list_remove(&cur->child_elem);
 		sema_up(&cur->parent->sync_lock);
 	}
 }
