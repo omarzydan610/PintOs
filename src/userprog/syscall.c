@@ -52,7 +52,7 @@ syscall_handler(struct intr_frame *f)
     break;
   case SYS_EXEC:
     verify_string(args[0]);
-    f->eax = sys_exec((const char *)args[0]);
+    f->eax = process_execute((const char *)args[0]);
     return;
     break;
   case SYS_WAIT:
@@ -95,6 +95,7 @@ syscall_handler(struct intr_frame *f)
   }
   // printf("syscall handler finished : %d", syscall_number);
 }
+
 
 void verify_esp(void *esp)
 {
@@ -188,6 +189,19 @@ void sys_exit(int status)
     file_allow_write(current_thread->executable);
     file_close(current_thread->executable);
   }
+
+  for (int i = SYSTEM_FILES; i < MAX_FILES_PER_PROCESS; i++)
+  {
+    if (current_thread->files[i] != NULL)
+    {
+      lock_acquire(&fs_lock);
+      file_close(current_thread->files[i]->file_ptr);
+      lock_release(&fs_lock);
+      free(current_thread->files[i]);
+      current_thread->files[i] = NULL;
+    }
+  }
+
   printf("%s: exit(%d)\n", current_thread->name, status);
   thread_exit();
 }
@@ -410,11 +424,4 @@ int handle_read_from_system_files(int fd, void *buffer, unsigned length)
   else
     sys_exit(-1);
   return length;
-}
-
-static int
-sys_exec(const char *cmd_line)
-{
-  tid_t tid = process_execute(cmd_line);
-  return tid;
 }

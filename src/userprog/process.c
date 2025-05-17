@@ -155,6 +155,18 @@ void process_exit(void)
 	struct thread *cur = thread_current();
 	uint32_t *pd;
 
+
+  struct list_elem *next;
+  struct list_elem *e = list_begin(&cur->children);
+
+  for (; e != list_end(&cur->children); e = next)
+  {
+    next = list_next(e);
+    struct thread *cp = list_entry(e, struct thread, child_elem);
+    list_remove(&cp->child_elem);
+    free(cp);
+  }
+
 	/* Destroy the current process's page directory and switch back
 	 to the kernel-only page directory. */
 	pd = cur->pagedir;
@@ -171,6 +183,7 @@ void process_exit(void)
 		pagedir_activate(NULL);
 		pagedir_destroy(pd);
 	}
+
 	if (cur->parent && cur->parent->wait_on == cur->tid)
 	{
 		cur->parent->child_exit_status = cur->exit_status;
