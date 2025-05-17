@@ -8,6 +8,7 @@
 #include "threads/synch.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "string.h"
 // #include "lib/kernel/console.c"
 
 #define STDIN_FILENO 0
@@ -19,7 +20,7 @@ void sys_exit(int status);
 static int sys_exec(const char *cmd_line);
 struct lock fs_lock;
 
-void *verify_esp(void *esp);
+void verify_esp(void *esp);
 
 const int MAX_FILE_NAME_LENGTH = 14;
 
@@ -32,8 +33,8 @@ void syscall_init(void)
 static void
 syscall_handler(struct intr_frame *f)
 {
-  // printf("HIIIIIIII");
-  void *esp = verify_esp(f->esp);
+  verify_esp(f->esp);
+  void *esp = f->esp;
 
   int syscall_number = *(int *)esp;
 
@@ -50,27 +51,34 @@ syscall_handler(struct intr_frame *f)
     sys_exit(args[0]);
     break;
   case SYS_EXEC:
+    verify_string(args[0]);
     f->eax = sys_exec((const char *)args[0]);
+    return;
     break;
   case SYS_WAIT:
     f->eax = process_wait(args[0]);
     break;
   case SYS_CREATE:
+    verify_string(args[0]);
     sys_file_create(args, f);
     break;
   case SYS_REMOVE:
+    verify_string(args[0]);
     sys_file_remove(args, f);
     break;
   case SYS_OPEN:
+    verify_string(args[0]);
     sys_file_open(args, f);
     break;
   case SYS_FILESIZE:
     sys_file_size(args, f);
     break;
   case SYS_READ:
+    verify_buffer(args[1], args[2]);
     sys_file_read(args, f);
     break;
   case SYS_WRITE:
+    verify_buffer(args[1], args[2]);
     sys_file_write(args, f);
     break;
   case SYS_SEEK:
@@ -88,14 +96,43 @@ syscall_handler(struct intr_frame *f)
   // printf("syscall handler finished : %d", syscall_number);
 }
 
-void *verify_esp(void *esp)
+void verify_esp(void *esp)
 {
   // Check if esp is within the valid range
-  if (esp == NULL || esp < (void *)0x08048000 || esp >= (void *)PHYS_BASE)
+  if (esp == NULL || !is_user_vaddr(esp) || pagedir_get_page(thread_current()->pagedir, esp) == NULL)
   {
     sys_exit(-1);
   }
-  return esp;
+}
+
+void verify_string(const void *str)
+{
+  verify_esp((void *)str);
+
+  const char *s = (const char *)str;
+  while (true)
+  {
+    verify_esp((void *)s);
+    if (*s == '\0')
+    {
+      break;
+    }
+    s++;
+  }
+}
+
+void verify_buffer(void *buffer, unsigned size)
+{
+  verify_esp((void *)buffer);
+
+  int cnt = 0;
+  char *curr = (char *)buffer;
+  while (cnt < size)
+  {
+    verify_esp((void *)curr);
+    curr++;
+    cnt++;
+  }
 }
 
 int get_number_of_args(int syscall_number)
@@ -137,7 +174,8 @@ void load_args(int *esp, int *args, int numberOfArgs)
 {
   for (int i = 0; i < numberOfArgs; i++)
   {
-    args[i] = *(int *)verify_esp(esp + (i + 1));
+    verify_esp(esp + (i + 1));
+    args[i] = *(int *)(esp + (i + 1));
   }
 }
 
@@ -168,12 +206,12 @@ void sys_file_open(int *args, struct intr_frame *f)
   // printf("file open is called file name is : %s\n", file_name);
   if (file_name == NULL)
     sys_exit(-1);
-  else if(!strcmp(file_name, empty_str))
+  else if (!strcmp(file_name, empty_str))
   {
     f->eax = -1;
     return;
   }
-  
+
   // printf("file name is empty\n file name : %s\n", file_name);
   // printf("reached here in open -> 1 file name is : %s\n", file_name);
   lock_acquire(&fs_lock);
@@ -201,14 +239,15 @@ void sys_file_write(int *args, struct intr_frame *f)
 {
   int fd = args[0], written_bytes = args[2];
 
-  if(fd < 0 || fd >= MAX_FILES_PER_PROCESS){
+  if (fd < 0 || fd >= MAX_FILES_PER_PROCESS)
+  {
     f->eax = 0;
     return;
   }
 
   if (fd == STDIN_FILENO || fd == STDOUT_FILENO || fd == STDERR_FILENO)
   {
-    handle_sys_files(fd, (const char *) args[1], (size_t)args[2]);
+    handle_sys_files(fd, (const char *)args[1], (size_t)args[2]);
     f->eax = written_bytes;
     // printf("write finish\n");
     return;
@@ -220,7 +259,6 @@ void sys_file_write(int *args, struct intr_frame *f)
   lock_acquire(&fs_lock);
   f->eax = file_write(cur_file, (const void *)args[1], (off_t)args[2]);
   lock_release(&fs_lock);
-
 }
 
 void handle_sys_files(int fd, const char *buffer, off_t size)
@@ -314,10 +352,10 @@ void remove_file_from_table(const char *name)
 void sys_file_create(int *args, struct intr_frame *f)
 {
   char *empty_str = "";
-  if (args[0] == NULL || !strcmp((const char *)args[0], empty_str)) 
+  if (args[0] == NULL || !strcmp((const char *)args[0], empty_str))
     sys_exit(-1);
-    
-  if(strlen((char *)args[0]) > MAX_FILE_NAME_LENGTH)
+
+  if (strlen((char *)args[0]) > MAX_FILE_NAME_LENGTH)
   {
     f->eax = 0;
     return;
@@ -334,12 +372,14 @@ void sys_file_read(int *args, struct intr_frame *f)
   int fd = args[0];
   const void *buffer = (const void *)args[1];
   unsigned length = args[2];
-  if(fd == NULL || buffer == NULL || length == NULL){
+  if (fd == NULL || buffer == NULL || length == NULL)
+  {
     f->eax = 0;
     return;
   }
 
-  if(fd < 0 || fd >= MAX_FILES_PER_PROCESS){
+  if (fd < 0 || fd >= MAX_FILES_PER_PROCESS)
+  {
     f->eax = 0;
     return;
   }
@@ -371,22 +411,7 @@ int handle_read_from_system_files(int fd, void *buffer, unsigned length)
 static int
 sys_exec(const char *cmd_line)
 {
-  if (cmd_line == NULL)
-    return -1;
 
-  for (const char *c = cmd_line; *c != '\0'; c++)
-  {
-    if (!is_user_vaddr((const void *)c))
-      return -1;
-    verify_esp((void *)c);
-  }
-
-  //!   // Make sure the string is accessible
-  //! char *str = pagedir_get_page(thread_current()->pagedir, cmd_line);
-  //! if (str == NULL)
-  //!   return -1;
-
-  // printf("in sys_exec cmd_file: %s", cmd_line);
   tid_t tid = process_execute(cmd_line);
   return tid;
 }
