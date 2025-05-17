@@ -61,6 +61,10 @@ process_execute (const char *file_name)
 	else {
 		// struct thread* child = get_thread_by_tid(tid);
 		sema_down(&thread_current()->sync_lock);
+		if (thread_current()->child_exit_status == -1) {
+			tid = TID_ERROR;
+		}
+
 	}
 	return tid;
 }
@@ -92,6 +96,7 @@ start_process (void *file_name_)
 	palloc_free_page (file_name);
 	if (!success){	
 		sema_up(&parent->sync_lock);
+		current_thread->parent->child_exit_status = -1;
 		thread_exit ();
 	}
 	else {
