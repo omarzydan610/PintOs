@@ -30,7 +30,7 @@ int sys_file_size(int fd);
 void sys_file_seek(int fd, unsigned new_pos);
 int sys_file_tell(int fd);
 int sys_file_read(int fd, void* buffer, unsigned length);
-void syscall_close(int fd);
+void sys_file_close(int fd);
 
 // Process management
 void sys_exit(int status);

@@ -88,7 +88,7 @@ syscall_handler(struct intr_frame *f)
     break;
   case SYS_CLOSE:
     // verify_buffer(args[0], 1);
-    syscall_close(args[0]);
+    sys_file_close(args[0]);
     break;
   default:
     sys_exit(-1);
@@ -190,10 +190,6 @@ void sys_exit(int status)
     file_close(current_thread->executable);
   }
 
-  for (int i = SYSTEM_FILES; i < MAX_FILES_PER_PROCESS; i++)
-    if (current_thread->files[i] != NULL)
-      syscall_close(i);
-
   printf("%s: exit(%d)\n", current_thread->name, status);
   thread_exit();
 }
@@ -203,7 +199,7 @@ struct file *my_get_file(int fd)
   // printf("my get file and fd is : %d caller is : %s\n", fd, caller_name);
   struct thread *t = thread_current();
   struct open_file *cur_file = t->files[fd];
-  if (cur_file == NULL)
+  if (cur_file == NULL || cur_file->file_ptr == NULL)
     sys_exit(-1);
   return cur_file->file_ptr;
 }
@@ -339,7 +335,7 @@ remove_file_from_table(const char *name)
   struct thread *t = thread_current();
   for (int i = SYSTEM_FILES; i < MAX_FILES_PER_PROCESS; ++i)
   {
-    if (t->files[i]->name == name)
+    if (t->files[i] && t->files[i]->name == name)
     {
       free(t->files[i]);
       t->files[i] = NULL;
@@ -395,12 +391,10 @@ int handle_read_from_system_files(int fd, void *buffer, unsigned length)
 }
 
 void
-syscall_close(int fd)
+sys_file_close(int fd)
 {
   if(fd < SYSTEM_FILES || fd > MAX_FILES_PER_PROCESS)
     sys_exit(-1);
-
-
 
   struct file* f = my_get_file(fd);
   remove_file_from_table_by_fd(fd);
@@ -408,7 +402,6 @@ syscall_close(int fd)
   lock_acquire(&fs_lock);
   file_close(f);
   lock_release(&fs_lock);
-
 }
 
 void

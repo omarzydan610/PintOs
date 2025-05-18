@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "../userprog/syscall.h"
 
 /* Used for setup_stack */
 static void push_stack(int order, void **esp, char *token, char **argv, int argc);
@@ -155,6 +156,9 @@ void process_exit(void)
 	struct thread *cur = thread_current();
 	uint32_t *pd;
 
+  	for (int i = SYSTEM_FILES; i < MAX_FILES_PER_PROCESS; i++)
+		if (cur->files[i] != NULL)
+			sys_file_close(i);
 
   struct list_elem *next;
   struct list_elem *e = list_begin(&cur->children);

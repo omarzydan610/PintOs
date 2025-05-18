@@ -116,7 +116,7 @@ struct thread
 
    /* files the process ownes */
    int files_cnt;
-   struct open_file* files[MAX_FILES_PER_PROCESS];
+   struct open_file** files;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -205,7 +206,17 @@ thread_create (const char *name, int priority,
 	sf->ebp = 0;
 
 	t->files_cnt = SYSTEM_FILES;
-	
+	// t->files = malloc(MAX_FILES_PER_PROCESS * sizeof(struct open_file*));
+
+	t->files = palloc_get_page(PAL_ZERO);
+	if (t->files == NULL) {
+		palloc_free_page(t);
+		return TID_ERROR;
+	}
+	for (int i = 0; i < MAX_FILES_PER_PROCESS; i++) {
+        t->files[i] = NULL;
+    }
+
 	list_push_back(&thread_current()->children, &t->child_elem);
 	t->parent = thread_current();
 	t->executable = executable;
