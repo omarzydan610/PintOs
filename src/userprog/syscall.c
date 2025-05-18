@@ -9,6 +9,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "string.h"
+#include "threads/palloc.h"
 // #include "lib/kernel/console.c"
 
 #define STDIN_FILENO 0
@@ -225,7 +226,9 @@ sys_file_open(const char* file_name)
   if (opened_file != NULL)
   {
     struct thread *t = thread_current();
-    struct open_file *file = (struct open_file *)malloc(sizeof(struct open_file));
+    struct open_file *file = palloc_get_page(PAL_ZERO); // Zero-initialized page
+    if (file == NULL)
+      return -1;
     file->file_ptr = opened_file;
     file->name = file_name;
     t->files[t->files_cnt] = file;
@@ -337,7 +340,7 @@ remove_file_from_table(const char *name)
   {
     if (t->files[i] && t->files[i]->name == name)
     {
-      free(t->files[i]);
+      palloc_free_page(t->files[i]);
       t->files[i] = NULL;
       t->files_cnt--;
       break;
@@ -409,8 +412,8 @@ remove_file_from_table_by_fd(int fd){
   struct thread* t = thread_current ();
   if(t->files[fd] == NULL)
     sys_exit(-1);
-  
-  free(t->files[fd]);
+
+  palloc_free_page(t->files[fd]);
   t->files[fd] = NULL; 
   t->files_cnt--;
 }
