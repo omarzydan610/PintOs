@@ -86,6 +86,8 @@ typedef int tid_t;
 struct open_file {
    struct file* file_ptr;
    const char* name;
+   struct list_elem elem;
+   int fd;
 };
 struct thread
   {
@@ -116,10 +118,10 @@ struct thread
 
    /* files the process ownes */
    int files_cnt;
-   struct open_file** files;
-
-    /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
+   struct list files;
+   int next_fd;
+   /* Owned by thread.c. */
+   unsigned magic; /* Detects stack overflow. */
   };
 
 /* If false (default), use round-robin scheduler.

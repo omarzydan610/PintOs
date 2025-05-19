@@ -208,14 +208,8 @@ thread_create (const char *name, int priority,
 	t->files_cnt = SYSTEM_FILES;
 	// t->files = malloc(MAX_FILES_PER_PROCESS * sizeof(struct open_file*));
 
-	t->files = palloc_get_page(PAL_ZERO);
-	if (t->files == NULL) {
-		palloc_free_page(t);
-		return TID_ERROR;
-	}
-	for (int i = 0; i < MAX_FILES_PER_PROCESS; i++) {
-        t->files[i] = NULL;
-    }
+	list_init(&t->files);
+	t->next_fd = SYSTEM_FILES;
 
 	list_push_back(&thread_current()->children, &t->child_elem);
 	t->parent = thread_current();
@@ -618,14 +612,11 @@ allocate_tid (void)
 }
 
 void repair_file_table(struct thread* t){
-	struct open_file* temp_files[MAX_FILES_PER_PROCESS];
-	int files_cnt = SYSTEM_FILES;
-	for(int i = SYSTEM_FILES; i < MAX_FILES_PER_PROCESS; ++i){
-		if(t->files[i] != NULL)
-			temp_files[files_cnt++] = t->files[i];
-	}
-	memcpy(t->files, temp_files, sizeof(t->files));
-	t->files_cnt = files_cnt;
+	struct list_elem *e;
+	int count = 0;
+	for (e = list_begin(&t->files); e != list_end(&t->files); e = list_next(e))
+		count++;
+	t->files_cnt = count;
 }
 
 /* Offset of `stack' member within `struct thread'.

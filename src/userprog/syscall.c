@@ -18,7 +18,6 @@
 
 struct lock fs_lock;
 
-
 void verify_esp(void *esp);
 static void syscall_handler(struct intr_frame *f);
 
@@ -60,29 +59,29 @@ syscall_handler(struct intr_frame *f)
     break;
   case SYS_CREATE:
     verify_string(args[0]);
-    f->eax = sys_file_create((const char*)args[0], (unsigned) args[1]);
+    f->eax = sys_file_create((const char *)args[0], (unsigned)args[1]);
     break;
   case SYS_REMOVE:
     verify_string(args[0]);
-    f->eax = sys_file_remove((const char*)args[0]);
+    f->eax = sys_file_remove((const char *)args[0]);
     break;
   case SYS_OPEN:
     verify_string(args[0]);
-    f->eax = sys_file_open((const char*) args[0]);
+    f->eax = sys_file_open((const char *)args[0]);
     break;
   case SYS_FILESIZE:
     f->eax = sys_file_size(args[0]);
     break;
   case SYS_READ:
     verify_buffer(args[1], args[2]);
-    f->eax = sys_file_read(args[0], (void *) args[1], (unsigned) args[2]);
+    f->eax = sys_file_read(args[0], (void *)args[1], (unsigned)args[2]);
     break;
   case SYS_WRITE:
     verify_buffer(args[1], args[2]);
-    f->eax = sys_file_write(args[0], (void *) args[1], (unsigned) args[2]);
+    f->eax = sys_file_write(args[0], (void *)args[1], (unsigned)args[2]);
     break;
   case SYS_SEEK:
-    sys_file_seek(args[0], (off_t) args[1]);
+    sys_file_seek(args[0], (off_t)args[1]);
     break;
   case SYS_TELL:
     f->eax = sys_file_tell(args[0]);
@@ -96,7 +95,6 @@ syscall_handler(struct intr_frame *f)
   }
   // printf("syscall handler finished : %d", syscall_number);
 }
-
 
 void verify_esp(void *esp)
 {
@@ -197,16 +195,22 @@ void sys_exit(int status)
 
 struct file *my_get_file(int fd)
 {
+  if (fd < 0 || fd < SYSTEM_FILES)
+    return NULL;
+
   // printf("my get file and fd is : %d caller is : %s\n", fd, caller_name);
   struct thread *t = thread_current();
-  struct open_file *cur_file = t->files[fd];
-  if (cur_file == NULL || cur_file->file_ptr == NULL)
-    sys_exit(-1);
-  return cur_file->file_ptr;
+  struct list_elem *e;
+  for (e = list_begin(&t->files); e != list_end(&t->files); e = list_next(e))
+  {
+    struct open_file *of = list_entry(e, struct open_file, elem);
+    if (of->fd == fd)
+      return of->file_ptr;
+  }
+  return NULL;
 }
 
-int 
-sys_file_open(const char* file_name)
+int sys_file_open(const char *file_name)
 {
 
   const char *empty_str = "";
@@ -226,21 +230,23 @@ sys_file_open(const char* file_name)
   if (opened_file != NULL)
   {
     struct thread *t = thread_current();
-    struct open_file *file = palloc_get_page(PAL_ZERO); // Zero-initialized page
+    struct open_file *file = palloc_get_page(PAL_ZERO);
     if (file == NULL)
       return -1;
+
     file->file_ptr = opened_file;
     file->name = file_name;
-    t->files[t->files_cnt] = file;
-    return t->files_cnt++;
+    file->fd = t->next_fd++;
+
+    list_push_back(&t->files, &file->elem);
+    return file->fd;
     // printf("reached here in open -> 2 file name is : %s returned fd is : %d\n", file_name, t->files_cnt - 1);
   }
   else
     return -1;
 }
 
-int
-sys_file_write(int fd, void* buffer, unsigned size)
+int sys_file_write(int fd, void *buffer, unsigned size)
 {
 
   if (fd < 0 || fd >= MAX_FILES_PER_PROCESS)
@@ -254,9 +260,11 @@ sys_file_write(int fd, void* buffer, unsigned size)
   }
 
   struct file *cur_file = my_get_file(fd);
+  if (cur_file == NULL)
+    return -1;
 
   lock_acquire(&fs_lock);
-  size = file_write(cur_file, buffer, (off_t) size);
+  size = file_write(cur_file, buffer, (off_t)size);
   lock_release(&fs_lock);
 
   return size;
@@ -267,7 +275,7 @@ void handle_sys_files(int fd, const char *buffer, unsigned size)
   if (fd == STDOUT_FILENO)
   {
     // printf("putuf is called\n");
-    putbuf(buffer, (off_t) size);
+    putbuf(buffer, (off_t)size);
     // printf("putuf returned\n");
   }
   else
@@ -282,12 +290,11 @@ void sys_file_seek(int fd, unsigned new_pos)
   struct file *cur_file = my_get_file(fd);
 
   lock_acquire(&fs_lock);
-  file_seek(cur_file, (off_t) new_pos);
+  file_seek(cur_file, (off_t)new_pos);
   lock_release(&fs_lock);
 }
 
-int
-sys_file_tell(int fd)
+int sys_file_tell(int fd)
 {
   if (fd < SYSTEM_FILES)
     sys_exit(-1);
@@ -306,7 +313,6 @@ int sys_file_size(int fd)
   if (fd < SYSTEM_FILES)
     sys_exit(-1);
 
-
   struct file *cur_file = my_get_file(fd);
 
   lock_acquire(&fs_lock);
@@ -316,8 +322,7 @@ int sys_file_size(int fd)
   return off;
 }
 
-bool 
-sys_file_remove(const char* file_name)
+bool sys_file_remove(const char *file_name)
 {
   char *empty_str = "";
   if (file_name == NULL || !strcmp(file_name, empty_str))
@@ -332,23 +337,25 @@ sys_file_remove(const char* file_name)
   return success;
 }
 
-void
-remove_file_from_table(const char *name)
+void remove_file_from_table(const char *name)
 {
   struct thread *t = thread_current();
-  for (int i = SYSTEM_FILES; i < MAX_FILES_PER_PROCESS; ++i)
+  struct list_elem *e;
+
+  for (e = list_begin(&t->files); e != list_end(&t->files); e = list_next(e))
   {
-    if (t->files[i] && t->files[i]->name == name)
+    struct open_file *of = list_entry(e, struct open_file, elem);
+    if (of->name == name)
     {
-      palloc_free_page(t->files[i]);
-      t->files[i] = NULL;
+      list_remove(&of->elem);
+      palloc_free_page(of);
       t->files_cnt--;
-      break;
+      return;
     }
   }
 }
 
-bool sys_file_create(const char* file_name, unsigned size)
+bool sys_file_create(const char *file_name, unsigned size)
 {
   char *empty_str = "";
   if (file_name == NULL || !strcmp(file_name, empty_str))
@@ -363,8 +370,7 @@ bool sys_file_create(const char* file_name, unsigned size)
   return success;
 }
 
-int
-sys_file_read(int fd, void* buffer, unsigned length)
+int sys_file_read(int fd, void *buffer, unsigned length)
 {
   if (fd == NULL || buffer == NULL || length == NULL || fd < 0 || fd >= MAX_FILES_PER_PROCESS)
     return 0;
@@ -373,6 +379,8 @@ sys_file_read(int fd, void* buffer, unsigned length)
     handle_read_from_system_files(fd, buffer, length);
 
   struct file *file_to_read_from = my_get_file(fd);
+  if (file_to_read_from == NULL)
+    return -1;
   int actual_read = file_read(file_to_read_from, buffer, length);
   return actual_read;
 }
@@ -393,27 +401,42 @@ int handle_read_from_system_files(int fd, void *buffer, unsigned length)
   return length;
 }
 
-void
-sys_file_close(int fd)
+void sys_file_close(int fd)
 {
-  if(fd < SYSTEM_FILES || fd > MAX_FILES_PER_PROCESS)
+  if (fd < SYSTEM_FILES || fd > MAX_FILES_PER_PROCESS)
     sys_exit(-1);
 
-  struct file* f = my_get_file(fd);
-  remove_file_from_table_by_fd(fd);
+  struct thread *t = thread_current();
+  struct list_elem *e;
 
-  lock_acquire(&fs_lock);
-  file_close(f);
-  lock_release(&fs_lock);
+  for (e = list_begin(&t->files); e != list_end(&t->files); e = list_next(e))
+  {
+    struct open_file *of = list_entry(e, struct open_file, elem);
+    if (of != NULL && of->fd == fd)
+    {
+      file_close(of->file_ptr);
+      list_remove(&of->elem);
+      palloc_free_page(of);
+      t->files_cnt--;
+      return;
+    }
+  }
 }
 
-void
-remove_file_from_table_by_fd(int fd){
-  struct thread* t = thread_current ();
-  if(t->files[fd] == NULL)
-    sys_exit(-1);
+void remove_file_from_table_by_fd(int fd)
+{
+  struct thread *t = thread_current();
+  struct list_elem *e;
 
-  palloc_free_page(t->files[fd]);
-  t->files[fd] = NULL; 
-  t->files_cnt--;
+  for (e = list_begin(&t->files); e != list_end(&t->files); e = list_next(e))
+  {
+    struct open_file *of = list_entry(e, struct open_file, elem);
+    if (of->fd == fd)
+    {
+      list_remove(&of->elem);
+      palloc_free_page(of);
+      t->files_cnt--;
+      return;
+    }
+  }
 }

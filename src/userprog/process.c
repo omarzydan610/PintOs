@@ -156,19 +156,26 @@ void process_exit(void)
 	struct thread *cur = thread_current();
 	uint32_t *pd;
 
-  	for (int i = SYSTEM_FILES; i < MAX_FILES_PER_PROCESS; i++)
-		if (cur->files[i] != NULL)
-			sys_file_close(i);
+	// Close all files using list iteration
+	struct list_elem *e;
+	while (!list_empty(&cur->files))
+	{
+		e = list_begin(&cur->files);
+		struct open_file *of = list_entry(e, struct open_file, elem);
+		file_close(of->file_ptr);
+		list_remove(e);
+		palloc_free_page(of);
+	}
 
-  struct list_elem *next;
-  struct list_elem *e = list_begin(&cur->children);
+	struct list_elem *next;
+	e = list_begin(&cur->children);
 
-  for (; e != list_end(&cur->children); e = next)
-  {
-    next = list_next(e);
-    struct thread *cp = list_entry(e, struct thread, child_elem);
-    list_remove(&cp->child_elem);
-    free(cp);
+	for (; e != list_end(&cur->children); e = next)
+	{
+		next = list_next(e);
+		struct thread *cp = list_entry(e, struct thread, child_elem);
+		list_remove(&cp->child_elem);
+		// free(cp);
   }
 
 	/* Destroy the current process's page directory and switch back
