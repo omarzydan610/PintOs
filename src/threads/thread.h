@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -23,7 +24,8 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
+#define MAX_FILES_PER_PROCESS 128
+#define SYSTEM_FILES 3
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -80,6 +82,13 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+struct open_file {
+   struct file* file_ptr;
+   const char* name;
+   struct list_elem elem;
+   int fd;
+};
 struct thread
   {
     /* Owned by thread.c. */
@@ -101,9 +110,18 @@ struct thread
     struct list children;
     struct list_elem child_elem;
     int exit_status;
+    int child_exit_status;
+    struct file *executable;
+   
+    struct semaphore sync_lock;
+    tid_t wait_on; 
 
-    /* Owned by thread.c. */
-    unsigned magic;                     /* Detects stack overflow. */
+   /* files the process ownes */
+   int files_cnt;
+   struct list files;
+   int next_fd;
+   /* Owned by thread.c. */
+   unsigned magic; /* Detects stack overflow. */
   };
 
 /* If false (default), use round-robin scheduler.
@@ -118,7 +136,7 @@ void thread_tick (void);
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
-tid_t thread_create (const char *name, int priority, thread_func *, void *);
+tid_t thread_create (const char *name, int priority, thread_func *, void *, struct file *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
@@ -141,5 +159,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void repair_file_table(struct thread*);
 
 #endif /* threads/thread.h */
