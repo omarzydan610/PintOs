@@ -4,8 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "synch.h"
 #include "threads/fixedPoint.h"
-
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -21,10 +21,14 @@ typedef int tid_t;
 #define TID_ERROR ((tid_t) - 1) /* Error value for tid_t. */
 
 /* Thread priorities. */
+#define PRI_MIN 0                       /* Lowest priority. */
+#define PRI_DEFAULT 31                  /* Default priority. */
+#define PRI_MAX 63                      /* Highest priority. */
+#define MAX_FILES_PER_PROCESS 128
+#define SYSTEM_FILES 3
 #define PRI_MIN 0      /* Lowest priority. */
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63     /* Highest priority. */
-
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -81,6 +85,13 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
+struct open_file {
+   struct file* file_ptr;
+   const char* name;
+   struct list_elem elem;
+   int fd;
+};
 struct thread
 
   {
@@ -101,6 +112,27 @@ struct thread
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
 
+
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
+    /* Huthaifa for userprog*/
+    struct thread *parent;
+    struct list children;
+    struct list_elem child_elem;
+    int exit_status;
+    int child_exit_status;
+    struct file *executable;
+   
+    struct semaphore sync_lock;
+    tid_t wait_on; 
+
+   /* files the process ownes */
+   int files_cnt;
+   struct list files;
+   int next_fd;
+   /* Owned by thread.c. */
+   unsigned magic; /* Detects stack overflow. */
+  };
 #ifdef USERPROG
    /* Owned by userprog/process.c. */
    uint32_t *pagedir; /* Page directory. */
@@ -133,8 +165,8 @@ void thread_wake_sleeping_threads(int64_t current_tick);
 void thread_tick(void);
 void thread_print_stats(void);
 
-typedef void thread_func(void *aux);
-tid_t thread_create(const char *name, int priority, thread_func *, void *);
+typedef void thread_func (void *aux);
+tid_t thread_create (const char *name, int priority, thread_func *, void *, struct file *);
 
 void thread_block(void);
 void thread_unblock(struct thread *);
@@ -165,5 +197,6 @@ void calculateRecentCpu(struct thread *t);
 void incrementRecentCpu(void);
 void updateAllPriorities(void);
 bool priority_less(const struct list_elem *a, const struct list_elem *b, void *aux);
+void repair_file_table(struct thread*);
 
 #endif /* threads/thread.h */
